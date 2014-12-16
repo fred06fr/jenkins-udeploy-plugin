@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><plugin xmlns="http://www.urbancode.com/PluginXMLSchema_v1" xmlns:server="http://www.urbancode.com/PluginServerXMLSchema_v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <header>
+    <identifier id="com.ibm.udeploy.jenkinscall" name="Jenkins Call Plugin" version="1"/>
+    <description>
+      A set of steps to control Jenkins from Urban Code Deploy, launching jobs and executing scripts
+	  </description>
+    <tag>Automation/Jenkins</tag>
+  </header>
+  <step-type name="Jenkins Launch Job">
+    <description>Launch a Jenkins Job and wait for its completion, getting result in output property 'jobResult'</description>
+    <properties>
+      <property name="jobName" required="true">
+        <property-ui label="Name of the job to launch" type="textBox"/>
+      </property>
+      <property name="jobLaunchCause" required="true">
+        <property-ui default-value="Launched from Urban Code Deploy" label="Build launch cause, free text registered in the jenkins build" type="textBox"/>
+      </property>
+      <property name="jobTimeout" required="true">
+        <property-ui default-value="180000" label="Timeout for waiting for the job completion, in milliseconds" type="textBox"/>
+      </property>
+      <property name="jobParameters" required="false">
+        <property-ui label="Parameters of the job if needed, in the form 'myParam1=a value for this,myParam2=another value'" type="textBox"/>
+      </property>
+      
+      <property name="jenkinsUrl" required="true">
+        <property-ui default-value="${p:application/jenkinsUrl}" hidden="true" label="URL of the Jenkins server (ex: http://localhost:8080)" type="textBox"/>
+      </property>
+      <property name="jenkinsUser" required="true">
+        <property-ui default-value="${p:application/jenkinsUser}" hidden="true" label="User to connect to the Jenkins server" type="textBox"/>
+      </property>
+      <property name="jenkinsPassword" required="true">
+        <property-ui default-value="${p:application/jenkinsPassword}" hidden="true" label="Password to connect to the Jenkins server" type="textBox"/>
+      </property>      
+    </properties>
+    <!-- set status depending on outcome, and create property 'jobResult' with job jenkins status -->
+    <post-processing><![CDATA[
+        if (properties.get("exitCode") != 0) {
+            properties.put("Status", "Failure");
+        }
+        else {
+            properties.put("Status", "Success");
+            // find job result if any, and register it as a property
+            scanner.register("jobResult: <result>", function(lineNumber, line) {
+              var value = line.replace("jobResult: <result>", "");
+              var value = value.replace("</result>", "");
+              properties.put("jobResult", value);
+          	});         
+          	scanner.scan();
+        }
+     ]]></post-processing>
+    <!--The syntax of the command element is such that each argument goes on its own line.  
+    The arg attribute can be "value", "path", or "file". So this command will be:
+    ${GROOVY_HOME}/bin/groovy -cp src cmd.groovy ${PLUGIN_INPUT_PROPS} ${PLUGIN_OUTPUT_PROPS} -->
+    <command program="${GROOVY_HOME}/bin/groovy">
+      <arg value="-cp"/>
+      <arg path="lib/commons-httpclient-3.1.jar:lib/commons-codec-1.2.jar:lib/commons-logging-1.0.4.jar"/>
+      <arg file="com/ibm/udeploy/JenkinsCall.groovy"/>
+      <arg file="${PLUGIN_INPUT_PROPS}"/>
+      <arg file="${PLUGIN_OUTPUT_PROPS}"/>
+    </command>
+    </step-type>
+    
+  <step-type name="Jenkins Launch Groovy System Script">
+    <description>Launch a Jenkins Groovy System script, getting result in output property 'scriptResult'</description>
+    <properties>
+      <property name="jenkinsGroovySystemScript" required="true">
+        <property-ui label="Script Text to execute. Hint: develop and test it using Jenkins script console (http://your_jenkins/script), then paste here" type="textAreaBox"/>
+      </property>
+      
+      <property name="jenkinsUrl" required="true">
+        <property-ui default-value="${p:application/jenkinsUrl}" hidden="true" label="URL of the Jenkins server (ex: http://localhost:8080)" type="textBox"/>
+      </property>
+      <property name="jenkinsUser" required="true">
+        <property-ui default-value="${p:application/jenkinsUser}" hidden="true" label="User to connect to the Jenkins server" type="textBox"/>
+      </property>
+      <property name="jenkinsPassword" required="true">
+        <property-ui default-value="${p:application/jenkinsPassword}" hidden="true" label="Password to connect to the Jenkins server" type="textBox"/>
+      </property>      
+    </properties>
+    <!-- set status depending on outcome, and create property 'scriptResult' with job jenkins status -->
+    <post-processing><![CDATA[
+        if (properties.get("exitCode") != 0) {
+            properties.put("Status", "Failure");
+        }
+        else {
+            properties.put("Status", "Success");
+            // find job result if any, and register it as a property
+            scanner.register("scriptResult: ", function(lineNumber, line) {
+              var value = line.replace("scriptResult: ", "");
+              properties.put("scriptResult", value);
+          	});         
+          	scanner.scan();
+        }
+     ]]></post-processing>
+    <!--The syntax of the command element is such that each argument goes on its own line.  
+    The arg attribute can be "value", "path", or "file". So this command will be:
+    ${GROOVY_HOME}/bin/groovy -cp src cmd.groovy ${PLUGIN_INPUT_PROPS} ${PLUGIN_OUTPUT_PROPS} -->
+    <command program="${GROOVY_HOME}/bin/groovy">
+      <arg value="-cp"/>
+      <arg path="lib/commons-httpclient-3.1.jar:lib/commons-codec-1.2.jar:lib/commons-logging-1.0.4.jar"/>
+      <arg file="com/ibm/udeploy/JenkinsCall.groovy"/>
+      <arg file="${PLUGIN_INPUT_PROPS}"/>
+      <arg file="${PLUGIN_OUTPUT_PROPS}"/>
+    </command>
+    </step-type>    
+ </plugin>
