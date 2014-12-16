@@ -1,7 +1,8 @@
 jenkins-udeploy-plugin
 ======================
 
-* What is it?
+## What is it?
+
 A plugin for IBM Urban Code Deploy that adds process steps to control Jenkins, launching jobs and executing scripts.
 
 A typical use case is to launch tests after a deployment.<br/>
@@ -17,7 +18,8 @@ The plugin assumes your Jenkins is secured (we are in real life, aren't we?). So
 
 _Notice that there is another UCD-Jenkins plugin (https://developer.ibm.com/urbancode/plugin/jenkins/) that provides integration on the other side, to publish Jenkins builds to UCD_
 
-* How to build and use?
+## How to build and use?
+
 You can easily build the plugin using Maven. 
 Just run "mvn install -DskipTests" in the root directory.
 The built plugin is then available in "target/jenkins-udeploy-plugin-1.0-SNAPSHOT-plugin.zip", ready to import in Urban Code Deploy as usual.
