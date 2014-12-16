@@ -14,6 +14,7 @@ This plugin provides two steps:
 
 The plugin assumes your Jenkins is secured (we are in real life, aren't we?). So you will need to feed in UCD your jenkins server URL, as well as a user name and password (who has permission to run jobs and scripts in Jenkins).
 
+_Notice that there is another UCD-Jenkins plugin (https://developer.ibm.com/urbancode/plugin/jenkins/) that provides integration on the other side, to publish Jenkins builds to UCD_
 
 
 
