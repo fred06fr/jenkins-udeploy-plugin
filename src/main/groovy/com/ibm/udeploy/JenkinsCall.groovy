@@ -29,17 +29,22 @@ if ((jobName!=null) && (jobName.trim().length()!=0)) {
   final long jobTimeout = Long.parseLong(props['jobTimeout']);
   final long pollTime=3000;
 
-  String urlAction="/job/${jobName}/buildWithParameters?cause=${URLEncoder.encode(jobLaunchCause, 'UTF-8')}";
-  for(String p:jobParameters.split(",")) {
-    if ((p!=null) && (p.trim().length()!=0)) {
-      int sep=p.indexOf('=');
-      if (sep==-1) {
-        throw new Exception("Parameters format is 'param1=xxx,param2=yyy', the param ${p} does not match");
+  String urlAction;
+  if ((jobParameters!=null) && (jobParameters.trim().length()!=0)) {
+    urlAction="/job/${jobName}/buildWithParameters?cause=${URLEncoder.encode(jobLaunchCause, 'UTF-8')}";
+    for(String p:jobParameters.split(",")) {
+      if ((p!=null) && (p.trim().length()!=0)) {
+        int sep=p.indexOf('=');
+        if (sep==-1) {
+          throw new Exception("Parameters format is 'param1=xxx,param2=yyy', the param ${p} does not match");
+        }
+        String pName = p.substring(0, sep);
+        String pValue=p.substring(sep+1);
+        urlAction="${urlAction}&${pName}=${URLEncoder.encode(pValue,'UTF-8')}";
       }
-      String pName = p.substring(0, sep);
-      String pValue=p.substring(sep+1);
-      urlAction="${urlAction}&${pName}=${URLEncoder.encode(pValue,'UTF-8')}";
     }
+  } else {
+    urlAction="/job/${jobName}/build?cause=${URLEncoder.encode(jobLaunchCause, 'UTF-8')}";
   }
 
   println("Launch job ${jobName} on Jenkins using \"${jenkinsUrl}${urlAction}\"");
@@ -129,6 +134,6 @@ def HttpClient createJenkinsClientHttp(String jenkinsUrl,String jenkinsUser,Stri
 }
 
 def void checkResult(HttpMethod m,int expectedCode) throws IOException {
-  if(m.getStatusCode()!=expectedCode)
+  if((m.getStatusCode()!=expectedCode) && (m.getStatusCode()!=expectedCode+1)) // 201 is also ok for 200 for example, or 303 instead of 302
     throw new IOException("Bad return code from Jenkins: ${m.getStatusCode()} for query '${m.getURI()}'. Result was '${m.getResponseBodyAsString()}'");
 }
