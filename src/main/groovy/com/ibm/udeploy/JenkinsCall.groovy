@@ -48,16 +48,29 @@ if ((jobName!=null) && (jobName.trim().length()!=0)) {
   }
 
   println("Launch job ${jobName} on Jenkins using \"${jenkinsUrl}${urlAction}\"");
-
-  String lastBuildNS=jenkinsGet(clientHttp,jenkinsUrl,"/job/${jobName}/lastBuild/buildNumber");
-  int lastBuildN=Integer.parseInt(lastBuildNS);
-  jenkinsPost(clientHttp,jenkinsUrl,urlAction,302);
+  
+  int nextBuildN=1;
+  try {
+    String nextBuildNS=jenkinsGet(clientHttp,jenkinsUrl,"/job/${jobName}/api/xml?tree=nextBuildNumber&xpath=*/nextBuildNumber");
+    nextBuildNS=nextBuildNS.replace("<nextBuildNumber>","").replace("</nextBuildNumber>","");
+    nextBuildN=Integer.parseInt(nextBuildNS);
+  } catch(IOException ex) {
+    if (ex.getMessage().contains("404")) {
+      // still not launched, might we expected
+      println("can't get next build number, assuming job never launched");
+    } else {
+      throw ex;
+    }
+  }
+  println("Build number will be ${nextBuildN}");
+  
+  jenkinsPost(clientHttp,jenkinsUrl,urlAction,[200,201,300,302]);
   long startTime=System.currentTimeMillis();
   boolean jobCompleted=false;
   // wait for job appearance and completion
   while(((System.currentTimeMillis()-startTime)<jobTimeout) && (!jobCompleted)) {
     try {
-      String isBuilding=jenkinsGet(clientHttp,jenkinsUrl,"/job/${jobName}/${lastBuildN+1}/api/xml?xpath=/*/building");
+      String isBuilding=jenkinsGet(clientHttp,jenkinsUrl,"/job/${jobName}/${nextBuildN}/api/xml?xpath=/*/building");
       println("Job still building, waiting...");
       if (isBuilding.contains("false")) {
         println("Job completed");
@@ -76,7 +89,7 @@ if ((jobName!=null) && (jobName.trim().length()!=0)) {
   if (!jobCompleted) {
     throw new Exception("Timeout after ${jobTimeout} ms waiting for the job to complete. You might have a look at \"${jenkinsUrl}/job/${jobName}\" to see what happens. Failing...");
   } else {
-    String jobResult=jenkinsGet(clientHttp,jenkinsUrl,"/job/${jobName}/${lastBuildN+1}/api/xml?xpath=/*/result");
+    String jobResult=jenkinsGet(clientHttp,jenkinsUrl,"/job/${jobName}/${nextBuildN}/api/xml?xpath=/*/result");
     // print job result: !!! this is scanned by plugin postprocessing (see plugin.xml) to set the output property
     println("jobResult: ${jobResult}");
   }
@@ -86,19 +99,19 @@ if ((jobName!=null) && (jobName.trim().length()!=0)) {
 if ((jenkinsGroovySystemScript!=null) && (jenkinsGroovySystemScript.trim().length()!=0)) {
   println("Executing groovy system script on Jenkins:");
   println(jenkinsGroovySystemScript);
-  String systemScriptResult=jenkinsPost(clientHttp,jenkinsUrl,"/scriptText?script=${URLEncoder.encode(jenkinsGroovySystemScript, 'UTF-8')}",200);
+  String systemScriptResult=jenkinsPost(clientHttp,jenkinsUrl,"/scriptText?script=${URLEncoder.encode(jenkinsGroovySystemScript, 'UTF-8')}");
   // print job result: !!! this is scanned by plugin postprocessing (see plugin.xml) to set the output property
   println("scriptResult: ${systemScriptResult}");
 }
 
-def String jenkinsGet(HttpClient client,String jenkinsUrl,String urlAction) {
+def String jenkinsGet(HttpClient client,String jenkinsUrl,String urlAction,List expectedStatus=[200,201,202]) {
   HttpMethod method = new GetMethod("${jenkinsUrl}${urlAction}");
   client.executeMethod(method);
-  checkResult(method,200);
+  checkResult(method,expectedStatus);
   return method.getResponseBodyAsStream().text;
 }
 
-def String jenkinsPost(HttpClient client,String jenkinsUrl,String urlAction,int expectedStatus=200) {
+def String jenkinsPost(HttpClient client,String jenkinsUrl,String urlAction,List expectedStatus=[200,201,202]) {
   PostMethod method = new PostMethod("${jenkinsUrl}${urlAction}");
   client.executeMethod(method);
   checkResult(method,expectedStatus);
@@ -111,7 +124,7 @@ def HttpClient createJenkinsClientHttp(String jenkinsUrl,String jenkinsUser,Stri
   HttpClient client = new HttpClient();
   GetMethod loginLink = new GetMethod(jenkinsUrl+"/loginEntry");
   client.executeMethod(loginLink);
-  checkResult(loginLink,200);
+  checkResult(loginLink);
   //String location = jenkinsUrl+"/j_security_check";
   String location = jenkinsUrl+"/j_acegi_security_check";
   while(true) {
@@ -126,14 +139,18 @@ def HttpClient createJenkinsClientHttp(String jenkinsUrl,String jenkinsUser,Stri
       location = loginMethod.getResponseHeader("Location").getValue();
       continue;
     }
-    checkResult(loginMethod,200);
+    checkResult(loginMethod);
     break;
   }
   println "Authenticated";
   return client;
 }
 
-def void checkResult(HttpMethod m,int expectedCode) throws IOException {
-  if((m.getStatusCode()!=expectedCode) && (m.getStatusCode()!=expectedCode+1)) // 201 is also ok for 200 for example, or 303 instead of 302
+def void checkResult(HttpMethod m,List expectedStatus=[200,201,202]) throws IOException {
+  boolean ok=false;
+  for(int c in expectedStatus) {
+    ok=ok || (m.getStatusCode()==c);
+  }
+  if(!ok) 
     throw new IOException("Bad return code from Jenkins: ${m.getStatusCode()} for query '${m.getURI()}'. Result was '${m.getResponseBodyAsString()}'");
 }
